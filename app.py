@@ -21,9 +21,18 @@ with col2:
 # 3. PROSES DATA
 if file_internal and file_pemerintah:
     df_internal = pd.read_excel(file_internal)
-    # Membaca sheet pertama dari database eksternal
     df_pemerintah = pd.read_excel(file_pemerintah, sheet_name=0) 
     
+    # --- PERBAIKAN FORMAT TANGGAL (Menghilangkan 00:00:00) ---
+    for col in df_internal.columns:
+        if pd.api.types.is_datetime64_any_dtype(df_internal[col]):
+            df_internal[col] = df_internal[col].dt.strftime('%Y-%m-%d')
+            
+    for col in df_pemerintah.columns:
+        if pd.api.types.is_datetime64_any_dtype(df_pemerintah[col]):
+            df_pemerintah[col] = df_pemerintah[col].dt.strftime('%Y-%m-%d')
+    # ---------------------------------------------------------
+
     st.divider()
     st.subheader("⚙️ Mapping Kolom Data Internal")
     cols_int = df_internal.columns.tolist()
@@ -65,38 +74,28 @@ if file_internal and file_pemerintah:
                         if score > max_score_in_row: max_score_in_row = score
                         found_cols.append(f"Kolom ke-{idx+1} ({score}%)")
                 
-                # Mengembalikan skor tertinggi untuk filter, dan string detail untuk status
                 return max_score_in_row, ", ".join(found_cols)
 
-            # Salin data pemerintah dan beri prefix
             temp_gov = df_pemerintah.copy()
             temp_gov.columns = [f"EKSTERNAL_{c}" for c in temp_gov.columns]
             
-            # Hitung kecocokan
             res_match = temp_gov.apply(lambda r: pd.Series(check_row_match(r)), axis=1)
-            
-            # Masukkan kolom STATUS_KOLOM_ALIAS di paling kiri data eksternal
             temp_gov.insert(0, 'STATUS_KOLOM_ALIAS', res_match[1])
             
-            # Gunakan skor dari res_match[0] hanya untuk memfilter (tidak dimasukkan ke df)
             matches = temp_gov[res_match[0] >= threshold].copy()
             
             if not matches.empty:
-                # Siapkan Data Internal (Kiri) dengan prefix
                 internal_data = pd.DataFrame([row_int] * len(matches)).reset_index(drop=True)
                 internal_data.columns = [f"INTERNAL_{c}" for c in internal_data.columns]
                 
-                # Gabungkan: INTERNAL + STATUS_KOLOM_ALIAS + EKSTERNAL
                 combined = pd.concat([internal_data, matches.reset_index(drop=True)], axis=1)
                 all_results.append(combined)
 
         if all_results:
             final_report = pd.concat(all_results, ignore_index=True)
-            
             st.error(f"⚠️ Ditemukan {len(final_report)} baris indikasi kecocokan!")
             st.dataframe(final_report)
 
-            # PROSES DOWNLOAD
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 final_report.to_excel(writer, index=False, sheet_name='Hasil_Screening')
