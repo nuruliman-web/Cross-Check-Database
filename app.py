@@ -4,10 +4,10 @@ from thefuzz import fuzz
 import io
 
 # 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="Cross-Check Database APU PPT", layout="wide")
+st.set_page_config(page_title="Screening Berkala Data Nasabah", layout="wide")
 
-st.title("🔍 Cross-Check Database Multi-Parameter")
-st.write("Urutan Laporan: Data Internal ➔ Status Kolom Alias ➔ Data Eksternal")
+st.title("🔍 Screening Berkala Data Nasabah")
+st.write("Urutan penggunaan: Upload Data Internal & Eksternal ➔ Isi Status Kolom Alias ➔ Lakukan Pemeriksaan")
 
 # 2. FITUR UPLOAD
 col1, col2 = st.columns(2)
@@ -34,7 +34,7 @@ if file_internal and file_pemerintah:
     # ---------------------------------------------------------
 
     st.divider()
-    st.subheader("⚙️ Mapping Kolom Data Internal")
+    st.subheader("⚙️ Sesuaikan dengan kolom")
     cols_int = df_internal.columns.tolist()
     c1, c2, c3, c4 = st.columns(4)
     with c1: col_nama = st.selectbox("Kolom Nama", cols_int)
@@ -44,7 +44,7 @@ if file_internal and file_pemerintah:
 
     threshold = st.sidebar.slider("Ambang Kemiripan Nama (%)", 50, 100, 85)
 
-    if st.button("🚀 Mulai Cross-Check & Siapkan Download"):
+    if st.button("🚀 Mulai Pemeriksaan"):
         all_results = [] 
         progress_bar = st.progress(0)
         total_rows = len(df_internal)
@@ -101,7 +101,7 @@ if file_internal and file_pemerintah:
                 final_report.to_excel(writer, index=False, sheet_name='Hasil_Screening')
             
             st.download_button(
-                label="📥 Download Hasil Lengkap (Excel)",
+                label="📥 Download Hasil (Excel)",
                 data=output.getvalue(),
                 file_name="Hasil_CrossCheck_APUPPT.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
