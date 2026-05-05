@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Cross-Check Database APU PPT", layout="wide")
 
 st.title("🔍 Cross-Check Database Multi-Parameter")
-st.write("Bandingkan Data Internal (Kiri) dengan Data Eksternal (Kanan) & Download Hasilnya.")
+st.write("Urutan Laporan: Data Internal ➔ Info Kemiripan ➔ Data Eksternal")
 
 # 2. FITUR UPLOAD
 col1, col2 = st.columns(2)
@@ -21,7 +21,7 @@ with col2:
 # 3. PROSES DATA
 if file_internal and file_pemerintah:
     df_internal = pd.read_excel(file_internal)
-    # Kita hanya ambil sheet pertama saja sesuai permintaan
+    # Membaca sheet pertama dari database eksternal
     df_pemerintah = pd.read_excel(file_pemerintah, sheet_name=0) 
     
     st.divider()
@@ -36,7 +36,7 @@ if file_internal and file_pemerintah:
     threshold = st.sidebar.slider("Ambang Kemiripan Nama (%)", 50, 100, 85)
 
     if st.button("🚀 Mulai Cross-Check & Siapkan Download"):
-        all_results = [] # List untuk menampung baris hasil gabungan
+        all_results = [] 
         progress_bar = st.progress(0)
         total_rows = len(df_internal)
 
@@ -46,18 +46,16 @@ if file_internal and file_pemerintah:
             q_nama = str(row_int[col_nama]).strip().lower()
             q_nik = str(row_int[col_nik]).strip().lower()
 
-            # Fungsi untuk mencari kecocokan di setiap baris eksternal
             def check_row_match(row_gov):
                 found_cols = []
                 max_score = 0
                 
                 for idx, val_gov in enumerate(row_gov):
                     if pd.isna(val_gov): continue
-                    
                     val_str = str(val_gov).strip().lower()
                     
                     # Cek NIK (Exact)
-                    if q_nik != "nan" and q_nik == val_str:
+                    if q_nik != "nan" and q_nik != "" and q_nik == val_str:
                         max_score = 100
                         found_cols.append(f"Kolom ke-{idx+1} (NIK)")
                     
@@ -69,37 +67,36 @@ if file_internal and file_pemerintah:
                 
                 return max_score, ", ".join(found_cols)
 
-            # Jalankan pencarian di data eksternal
+            # Salin data pemerintah dan beri prefix
             temp_gov = df_pemerintah.copy()
-            # Beri prefix pada kolom eksternal agar beda dengan internal
             temp_gov.columns = [f"EKSTERNAL_{c}" for c in temp_gov.columns]
             
+            # Hitung skor kemiripan
             res_match = temp_gov.apply(lambda r: pd.Series(check_row_match(r)), axis=1)
-            temp_gov['Skor_Kemiripan'] = res_match[0]
-            temp_gov['Status_Kolom_Alias'] = res_match[1]
             
-            # Ambil yang masuk kriteria (Score > 0)
-            matches = temp_gov[temp_gov['Skor_Kemiripan'] >= threshold].copy()
+            # Buat kolom kemiripan
+            temp_gov.insert(0, 'STATUS_KOLOM_ALIAS', res_match[1])
+            temp_gov.insert(0, 'SKOR_KEMIRIPAN', res_match[0])
+            
+            # Filter yang cocok
+            matches = temp_gov[temp_gov['SKOR_KEMIRIPAN'] >= threshold].copy()
             
             if not matches.empty:
-                # Siapkan Data Internal (Kiri)
+                # Siapkan Data Internal (Kiri) dengan prefix
                 internal_data = pd.DataFrame([row_int] * len(matches)).reset_index(drop=True)
                 internal_data.columns = [f"INTERNAL_{c}" for c in internal_data.columns]
                 
-                # Gabungkan Kiri (Internal) + Kanan (Eksternal)
+                # Gabungkan: INTERNAL + KEMIRIPAN + EKSTERNAL
                 combined = pd.concat([internal_data, matches.reset_index(drop=True)], axis=1)
                 all_results.append(combined)
 
         if all_results:
             final_report = pd.concat(all_results, ignore_index=True)
             
-            # Pindahkan kolom Skor dan Status ke tengah/depan agar mudah dibaca
-            cols = final_report.columns.tolist()
-            # Kita taruh Skor & Status di paling depan setelah data internal
             st.error(f"⚠️ Ditemukan {len(final_report)} baris indikasi kecocokan!")
             st.dataframe(final_report)
 
-            # FITUR DOWNLOAD
+            # PROSES DOWNLOAD
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 final_report.to_excel(writer, index=False, sheet_name='Hasil_Screening')
@@ -107,7 +104,7 @@ if file_internal and file_pemerintah:
             st.download_button(
                 label="📥 Download Hasil Lengkap (Excel)",
                 data=output.getvalue(),
-                file_name="Hasil_CrossCheck_Lengkap.xlsx",
+                file_name="Hasil_Screening_APUPPT.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
