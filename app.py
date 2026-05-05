@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Screening Berkala Data Nasabah", layout="wide")
 
 st.title("🔍 Screening Berkala Data Nasabah")
-st.write("Urutan penggunaan: Upload Data Internal & Eksternal ➔ Isi Status Kolom Alias ➔ Lakukan Pemeriksaan")
+st.write("Urutan penggunaan: Upload Data Internal & Eksternal ➔ Isi Kolom Sesuai Data ➔ Lakukan Pemeriksaan")
 
 # 2. FITUR UPLOAD
 col1, col2 = st.columns(2)
