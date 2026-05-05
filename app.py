@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="Cross-Check Database APU PPT", layout="wide")
 
 st.title("🔍 Cross-Check Database Multi-Parameter")
-st.write("Urutan Laporan: Data Internal ➔ Info Kemiripan ➔ Data Eksternal")
+st.write("Urutan Laporan: Data Internal ➔ Status Kolom Alias ➔ Data Eksternal")
 
 # 2. FITUR UPLOAD
 col1, col2 = st.columns(2)
@@ -48,7 +48,7 @@ if file_internal and file_pemerintah:
 
             def check_row_match(row_gov):
                 found_cols = []
-                max_score = 0
+                max_score_in_row = 0
                 
                 for idx, val_gov in enumerate(row_gov):
                     if pd.isna(val_gov): continue
@@ -56,37 +56,37 @@ if file_internal and file_pemerintah:
                     
                     # Cek NIK (Exact)
                     if q_nik != "nan" and q_nik != "" and q_nik == val_str:
-                        max_score = 100
-                        found_cols.append(f"Kolom ke-{idx+1} (NIK)")
+                        max_score_in_row = 100
+                        found_cols.append(f"Kolom ke-{idx+1} (NIK COCOK)")
                     
                     # Cek Nama (Fuzzy)
                     score = fuzz.token_sort_ratio(q_nama, val_str)
                     if score >= threshold:
-                        if score > max_score: max_score = score
+                        if score > max_score_in_row: max_score_in_row = score
                         found_cols.append(f"Kolom ke-{idx+1} ({score}%)")
                 
-                return max_score, ", ".join(found_cols)
+                # Mengembalikan skor tertinggi untuk filter, dan string detail untuk status
+                return max_score_in_row, ", ".join(found_cols)
 
             # Salin data pemerintah dan beri prefix
             temp_gov = df_pemerintah.copy()
             temp_gov.columns = [f"EKSTERNAL_{c}" for c in temp_gov.columns]
             
-            # Hitung skor kemiripan
+            # Hitung kecocokan
             res_match = temp_gov.apply(lambda r: pd.Series(check_row_match(r)), axis=1)
             
-            # Buat kolom kemiripan
+            # Masukkan kolom STATUS_KOLOM_ALIAS di paling kiri data eksternal
             temp_gov.insert(0, 'STATUS_KOLOM_ALIAS', res_match[1])
-            temp_gov.insert(0, 'SKOR_KEMIRIPAN', res_match[0])
             
-            # Filter yang cocok
-            matches = temp_gov[temp_gov['SKOR_KEMIRIPAN'] >= threshold].copy()
+            # Gunakan skor dari res_match[0] hanya untuk memfilter (tidak dimasukkan ke df)
+            matches = temp_gov[res_match[0] >= threshold].copy()
             
             if not matches.empty:
                 # Siapkan Data Internal (Kiri) dengan prefix
                 internal_data = pd.DataFrame([row_int] * len(matches)).reset_index(drop=True)
                 internal_data.columns = [f"INTERNAL_{c}" for c in internal_data.columns]
                 
-                # Gabungkan: INTERNAL + KEMIRIPAN + EKSTERNAL
+                # Gabungkan: INTERNAL + STATUS_KOLOM_ALIAS + EKSTERNAL
                 combined = pd.concat([internal_data, matches.reset_index(drop=True)], axis=1)
                 all_results.append(combined)
 
@@ -104,7 +104,7 @@ if file_internal and file_pemerintah:
             st.download_button(
                 label="📥 Download Hasil Lengkap (Excel)",
                 data=output.getvalue(),
-                file_name="Hasil_Screening_APUPPT.xlsx",
+                file_name="Hasil_CrossCheck_APUPPT.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
